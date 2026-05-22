@@ -1,6 +1,6 @@
 import streamlit as st
 import calendar
-from datetime import date
+from datetime import date, datetime
 import holidays
 
 # Configuração da página
@@ -18,6 +18,7 @@ meses_pt = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
 
 st.sidebar.header("⚙️ Configurações")
 tipo_escala = st.sidebar.selectbox("Tipo de Escala", ["6x2", "5x2"])
+# Forçamos a data para ser tratada como data pura, sem horas, para evitar erro no celular
 data_inicio = st.sidebar.date_input("Início do ciclo", date.today())
 cor_folga = st.sidebar.color_picker("Cor da folga", "#4CAF50")
 
@@ -31,7 +32,6 @@ with col1:
         if st.session_state.mes_atual < 1:
             st.session_state.mes_atual = 12
             st.session_state.ano_atual -= 1
-            st.rerun()
         st.rerun()
 
 with col2:
@@ -43,38 +43,50 @@ with col3:
         if st.session_state.mes_atual > 12:
             st.session_state.mes_atual = 1
             st.session_state.ano_atual += 1
-            st.rerun()
         st.rerun()
 
 # Gerador de Calendário
 def gerar_calendario(ano, mes, inicio, escala, cor):
     cal = calendar.monthcalendar(ano, mes)
     feriados = holidays.Brazil(years=ano)
+    
     html = f"""
     <style>
         .folga {{background-color: {cor}; color: white; border-radius: 50%; display: inline-block; width: 30px; height: 30px; line-height: 30px;}}
-        .feriado {{color: red; font-weight: bold;}}
-        table {{width: 100%; border-collapse: collapse;}}
+        .feriado {{color: red; font-weight: bold; text-decoration: underline;}}
+        table {{width: 100%; border-collapse: collapse; margin-top: 20px;}}
         td {{text-align: center; padding: 10px;}}
+        th {{text-align: center; padding: 10px;}}
     </style>
-    <table><tr><th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th><th>Sáb</th><th>Dom</th></tr>
+    <table>
+        <tr><th>Seg</th><th>Ter</th><th>Qua</th><th>Qui</th><th>Sex</th><th>Sáb</th><th>Dom</th></tr>
     """
+    
     for semana in cal:
         html += "<tr>"
         for dia in semana:
             if dia == 0:
                 html += "<td></td>"
             else:
-                data = date(ano, mes, dia)
-                dias_passados = (data - inicio).days
+                # Criamos a data do dia atual do calendário
+                data_atual = date(ano, mes, dia)
+                
+                # Calculamos a diferença de dias garantindo que estamos comparando datas
+                delta = data_atual - inicio
+                dias_passados = delta.days
+                
                 is_folga = False
                 if dias_passados >= 0:
-                    if escala == "6x2": is_folga = (dias_passados % 8) >= 6
-                    else: is_folga = (dias_passados % 7) >= 5
+                    if escala == "6x2": 
+                        # Ciclo 6x2: 8 dias total (6 trabalhados, 2 folga)
+                        is_folga = (dias_passados % 8) >= 6
+                    else: 
+                        # Ciclo 5x2: 7 dias total (5 trabalhados, 2 folga)
+                        is_folga = (dias_passados % 7) >= 5
                 
                 classe = "folga" if is_folga else ""
-                estilo_feriado = "feriado" if data in feriados else ""
-                html += f"<td><span class='{classe} {estilo_feriado}'>{dia}</span></td>"
+                feriado = "feriado" if data_atual in feriados else ""
+                html += f"<td><span class='{classe} {feriado}'>{dia}</span></td>"
         html += "</tr>"
     return html + "</table>"
 
